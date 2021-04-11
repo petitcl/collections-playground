@@ -1,4 +1,4 @@
-package com.petitcl;
+package com.petitcl.collections;
 
 import java.util.*;
 

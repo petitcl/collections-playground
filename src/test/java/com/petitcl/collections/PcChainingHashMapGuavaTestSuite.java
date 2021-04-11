@@ -4,7 +4,6 @@ import com.google.common.collect.testing.MapTestSuiteBuilder;
 import com.google.common.collect.testing.features.CollectionFeature;
 import com.google.common.collect.testing.features.CollectionSize;
 import com.google.common.collect.testing.features.MapFeature;
-import com.petitcl.PcChainingHashMap;
 import com.petitcl.collections.models.Person;
 import com.petitcl.collections.utils.AbstractPersonMapTestGenerator;
 import junit.framework.TestCase;
