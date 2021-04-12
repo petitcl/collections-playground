@@ -43,7 +43,7 @@ public class PcChainingHashMap<K, V> extends AbstractMap<K, V> {
 
 		@Override
 		public V setValue(V value) {
-			assertNotNull(value, "Value must not be null");
+			Objects.requireNonNull(value);
 
 			final V oldValue = this.value;
 			this.value = value;
@@ -111,7 +111,7 @@ public class PcChainingHashMap<K, V> extends AbstractMap<K, V> {
 
 	@Override
 	public boolean containsKey(Object key) {
-		assertNotNull(key, "Key must not be null");
+		Objects.requireNonNull(key);
 
 		final Node<K, V> foundNode = getNodeForKey(this.table, key);
 		return foundNode != null;
@@ -119,7 +119,8 @@ public class PcChainingHashMap<K, V> extends AbstractMap<K, V> {
 
 	@Override
 	public boolean containsValue(Object value) {
-		assertNotNull(value, "Value must not be null");
+		Objects.requireNonNull(value);
+
 		final ValuesIterator iterator = new ValuesIterator();
 		while (iterator.hasNext()) {
 			final V nextValue = iterator.next();
@@ -132,7 +133,7 @@ public class PcChainingHashMap<K, V> extends AbstractMap<K, V> {
 
 	@Override
 	public V get(Object key) {
-		assertNotNull(key, "Key must not be null");
+		Objects.requireNonNull(key);
 
 		final Node<K, V> foundNode = getNodeForKey(key);
 		return foundNode != null ? foundNode.value : null;
@@ -140,15 +141,15 @@ public class PcChainingHashMap<K, V> extends AbstractMap<K, V> {
 
 	@Override
 	public V put(K key, V value) {
-		assertNotNull(key, "Key must not be null");
-		assertNotNull(value, "Value must not be null");
+		Objects.requireNonNull(key);
+		Objects.requireNonNull(value);
 
 		return putNodeForKey(key, value);
 	}
 
 	@Override
 	public V remove(Object key) {
-		assertNotNull(key, "Key must not be null");
+		Objects.requireNonNull(key);
 
 		final Node<K, V> removedNode = removeNodeForKey(key);
 		return removedNode != null ? removedNode.value : null;
@@ -538,9 +539,4 @@ public class PcChainingHashMap<K, V> extends AbstractMap<K, V> {
 		this.table = newTable;
 	}
 
-	private static void assertNotNull(Object param, String message) {
-		if (param == null) {
-			throw new NullPointerException(message);
-		}
-	}
 }

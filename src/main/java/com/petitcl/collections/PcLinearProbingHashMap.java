@@ -5,14 +5,22 @@ import java.util.*;
 /**
  * Implementation of {@link Map} that is backed by a hash table
  * and that uses linear probing to handle collisions.
+ * This implementation does not use any tombstones: if an element is deleted,
+ * its spot will be filled with an out of place entry if such an entry exists.
  *
  * @param <K> type of the key
  * @param <V> type of the value
  */
 public class PcLinearProbingHashMap<K, V> extends AbstractMap<K, V> {
 
-//	public static final int DEFAULT_INITIAL_CAPACITY = 16;
-	public static final int DEFAULT_INITIAL_CAPACITY = 1000;
+	/**
+	 * Maximum number of successive resizes that can occur
+	 * during an insertion operation.
+	 * If more resizes that this constant should occur,
+	 * a
+	 */
+	public static final int MAX_SUCCESSIVE_RESIZES = 10;
+	public static final int DEFAULT_INITIAL_CAPACITY = 16;
 	public static final float DEFAULT_LOAD_FACTOR = 0.75f;
 
 	public static class Entry<K, V> implements Map.Entry<K, V> {
@@ -36,7 +44,7 @@ public class PcLinearProbingHashMap<K, V> extends AbstractMap<K, V> {
 
 		@Override
 		public V setValue(V value) {
-			assertNotNull(value, "Value must not be null");
+			Objects.requireNonNull(value);
 
 			final V oldValue = this.value;
 			this.value = value;
@@ -106,17 +114,29 @@ public class PcLinearProbingHashMap<K, V> extends AbstractMap<K, V> {
 
 	@Override
 	public boolean containsKey(Object key) {
-		throw new UnsupportedOperationException();
+		Objects.requireNonNull(key);
+
+		final Entry<K, V> foundEntry = getEntryForKey(key);
+		return foundEntry != null;
 	}
 
 	@Override
 	public boolean containsValue(Object value) {
-		throw new UnsupportedOperationException();
+		Objects.requireNonNull(value);
+
+		final ValuesIterator iterator = new ValuesIterator();
+		while (iterator.hasNext()) {
+			final V nextValue = iterator.next();
+			if (nextValue.equals(value)) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	@Override
 	public V get(Object key) {
-		assertNotNull(key, "Key must not be null");
+		Objects.requireNonNull(key);
 
 		final Entry<K, V> foundEntry = getEntryForKey(key);
 		return foundEntry != null ? foundEntry.value : null;
@@ -124,15 +144,15 @@ public class PcLinearProbingHashMap<K, V> extends AbstractMap<K, V> {
 
 	@Override
 	public V put(K key, V value) {
-		assertNotNull(key, "Key must not be null");
-		assertNotNull(value, "Value must not be null");
+		Objects.requireNonNull(key);
+		Objects.requireNonNull(value);
 
 		return putEntryForKey(key, value);
 	}
 
 	@Override
 	public V remove(Object key) {
-		assertNotNull(key, "Key must not be null");
+		Objects.requireNonNull(key);
 
 		final Entry<K, V> removedEntry = removeEntryForKey(key);
 		return removedEntry != null ? removedEntry.value : null;
@@ -140,24 +160,205 @@ public class PcLinearProbingHashMap<K, V> extends AbstractMap<K, V> {
 
 	@Override
 	public void clear() {
-		throw new UnsupportedOperationException();
+		this.size = 0;
+		Arrays.fill(this.table, null);
 	}
 
 	@Override
 	public Set<Map.Entry<K, V>> entrySet() {
-		throw new UnsupportedOperationException();
+		return new EntrySet();
+	}
+
+	public class EntrySet extends AbstractSet<Map.Entry<K, V>> {
+
+		@Override
+		public Iterator<Map.Entry<K, V>> iterator() {
+			return new EntrySetIterator();
+		}
+
+		@Override
+		public int size() {
+			return PcLinearProbingHashMap.this.size;
+		}
+
+		@Override
+		public boolean isEmpty() {
+			return size() == 0;
+		}
+
+		@Override
+		public void clear() {
+			PcLinearProbingHashMap.this.clear();
+		}
+
+		@Override
+		public boolean remove(Object o) {
+			if (o instanceof Map.Entry) {
+				final Map.Entry entry = (Map.Entry)o;
+				final V removed = PcLinearProbingHashMap.this.remove(entry.getKey());
+				return removed != null;
+			}
+			return false;
+		}
+
+	}
+
+	public class EntrySetIterator extends BaseIterator implements Iterator<Map.Entry<K, V>> {
+
+		@Override
+		public Map.Entry<K, V> next() {
+			return nextEntry();
+		}
+
 	}
 
 	@Override
 	public Set<K> keySet() {
-		throw new UnsupportedOperationException();
+		return new KeySet();
+	}
+
+	public class KeySet extends AbstractSet<K> {
+
+		@Override
+		public Iterator<K> iterator() {
+			return new KeysIterator();
+		}
+
+		@Override
+		public int size() {
+			return size;
+		}
+
+		@Override
+		public boolean isEmpty() {
+			return size() == 0;
+		}
+
+		@Override
+		public void clear() {
+			PcLinearProbingHashMap.this.clear();
+		}
+
+		@Override
+		public boolean remove(Object o) {
+			final V removed = PcLinearProbingHashMap.this.remove(o);
+			return removed != null;
+		}
+
+	}
+
+	public class KeysIterator extends BaseIterator implements Iterator<K> {
+
+		@Override
+		public K next() {
+			return nextEntry().getKey();
+		}
+
 	}
 
 	@Override
 	public Collection<V> values() {
-		throw new UnsupportedOperationException();
+		return new Values();
 	}
 
+	public class Values extends AbstractCollection<V> {
+
+		@Override
+		public Iterator<V> iterator() {
+			return new ValuesIterator();
+		}
+
+		@Override
+		public int size() {
+			return PcLinearProbingHashMap.this.size;
+		}
+
+		@Override
+		public boolean isEmpty() {
+			return size() == 0;
+		}
+
+		@Override
+		public void clear() {
+			PcLinearProbingHashMap.this.clear();
+		}
+
+	}
+
+	public class ValuesIterator extends BaseIterator implements Iterator<V> {
+
+		@Override
+		public V next() {
+			return nextEntry().getValue();
+		}
+
+	}
+
+	public abstract class BaseIterator {
+
+		private int indexInTable;
+		private Entry<K, V> nextEntry;
+		private Entry<K, V> currentEntry;
+
+		public BaseIterator() {
+			final Entry<K, V>[] table = PcLinearProbingHashMap.this.table;
+			this.indexInTable = 0;
+			this.nextEntry = null;
+			this.currentEntry = null;
+			// initially advance to first entry
+			while (this.nextEntry == null && this.indexInTable < table.length) {
+				this.nextEntry = table[this.indexInTable];
+				if (this.nextEntry == null) {
+					this.indexInTable++;
+				}
+			}
+		}
+
+		public boolean hasNext() {
+			return this.nextEntry != null;
+		}
+
+		protected Entry<K, V> nextEntry() {
+			if (this.nextEntry == null) {
+				throw new NoSuchElementException();
+			}
+			this.currentEntry = this.nextEntry;
+			computeNext();
+			return this.currentEntry;
+		}
+
+		public void remove() {
+			if (this.currentEntry == null) {
+				throw new IllegalStateException("next() has not been called yet, cannot use remove()");
+			}
+			PcLinearProbingHashMap.this.remove(this.currentEntry.key);
+			this.currentEntry = null;
+		}
+
+		private void computeNext() {
+			// advance to the next spot
+			if (this.nextEntry != null) {
+				this.nextEntry = null;
+				this.indexInTable++;
+			}
+
+			final Entry<K, V>[] table = PcLinearProbingHashMap.this.table;
+			// advance nextEntry to the next entry in the table
+			// or to the beginning of the table
+			while (this.nextEntry == null && this.indexInTable < table.length) {
+				this.nextEntry = table[indexInTable];
+				if (this.nextEntry == null) {
+					this.indexInTable++;
+				}
+			}
+		}
+
+	}
+
+	/**
+	 * Return a string representing the layout of the underlying table.
+	 * Useful for debugging.
+	 */
 	public String getLayout() {
 		if (size == 0) {
 			return "EMPTY (size=0, capacity=" + this.table.length + ", loadFactor=0)\n";
@@ -188,13 +389,14 @@ public class PcLinearProbingHashMap<K, V> extends AbstractMap<K, V> {
 	}
 
 	private int hash(Object key) {
-		return key.hashCode();
+		final int hashCode = key.hashCode();
+		return hashCode ^ (hashCode >>> 16);
 	}
 
-	private V putEntryForKey(K key, V value) {
+	private V putEntryForKey(K key, V value) throws TooManyHashMapResizeException {
 		this.resizeIfNeeded(false);
 
-		for (int i = 0; i < 5; i++) {
+		for (int i = 0; i < MAX_SUCCESSIVE_RESIZES; i++) {
 			try {
 				final V oldValue = putEntryForKey(this.table, key, value);
 				if (oldValue == null) {
@@ -202,16 +404,14 @@ public class PcLinearProbingHashMap<K, V> extends AbstractMap<K, V> {
 					this.size++;
 				}
 				return oldValue;
-			} catch (UnsupportedOperationException e) {
-				System.err.println("caught overflow error, retrying");
+			} catch (HashMapNeedResizeException e) {
 				this.resizeIfNeeded(true);
 			}
 		}
-		throw new UnsupportedOperationException();
+		throw new TooManyHashMapResizeException("Too many successive resizes");
 	}
 
-	private V putEntryForKey(Entry<K, V>[] target, K key, V value) {
-		System.err.println("put " + key);
+	private V putEntryForKey(Entry<K, V>[] target, K key, V value) throws HashMapNeedResizeException {
 		// compute hash and index
 		final int hash = hash(key);
 		final int size = target.length;
@@ -227,7 +427,6 @@ public class PcLinearProbingHashMap<K, V> extends AbstractMap<K, V> {
 			if (Objects.equals(entryAtIndex.getKey(), key)) {
 				// if entry exists and is the same key, replace it
 				target[i] = new Entry<>(key, value);
-				System.err.println("put " + key + " at index + " + i + " instead of " + index);
 				return entryAtIndex.value;
 			}
 			i++;
@@ -235,13 +434,9 @@ public class PcLinearProbingHashMap<K, V> extends AbstractMap<K, V> {
 		if (i < target.length && target[i] == null) {
 			// if no entry at index, use that spot to store new key
 			target[i] = new Entry<>(key, value);
-			System.err.println("put " + key + " at index " + i + " instead of " + index + " with hash " + hash);
 			return null;
 		} else {
-			System.err.println("need resize for put for " + key + " at index " + i);
-			throw new UnsupportedOperationException();
-//			this.resizeIfNeeded(true);
-//			return putEntryForKey(target, targetSize + 1, key, value);
+			throw new HashMapNeedResizeException("Hash Map need resize");
 		}
 	}
 
@@ -268,7 +463,6 @@ public class PcLinearProbingHashMap<K, V> extends AbstractMap<K, V> {
 			i++;
 		}
 		// if no entry was found, the key is not present
-		System.err.println("get " + key + " not found");
 		return null;
 	}
 
@@ -297,7 +491,6 @@ public class PcLinearProbingHashMap<K, V> extends AbstractMap<K, V> {
 			entryAtIndex = target[i];
 			if (Objects.equals(key, entryAtIndex.key)) {
 				// delete from here
-				System.err.println("delete " + key + " at index " + i);
 				deletedEntry = entryAtIndex;
 				target[i] = null;
 				break;
@@ -306,7 +499,6 @@ public class PcLinearProbingHashMap<K, V> extends AbstractMap<K, V> {
 		}
 		if (deletedEntry == null) {
 			// if no entry was found, the key was not there
-			System.err.println("could not delete " + key + " : not found at index " + i);
 			return null;
 		} else {
 			int emptiedIndex = i;
@@ -324,44 +516,61 @@ public class PcLinearProbingHashMap<K, V> extends AbstractMap<K, V> {
 			entryAtIndex = target[i];
 			final int currentHash = hash(entryAtIndex.key);
 			final int desiredPosition = (target.length - 1) & currentHash;
-			System.err.println("checking if can move " + entryAtIndex.key + " from index " + i + " to index " + emptyIndex + " desiredPosition=" + desiredPosition);
 			if (desiredPosition <= emptyIndex) {
-				System.err.println("moving " + entryAtIndex.key + " from index " + i + " to index " + emptyIndex + " desiredPosition=" + desiredPosition);
 				target[emptyIndex] = target[i];
 				target[i] = null;
 				return i;
 			}
 			i++;
 		}
-		System.err.println("could move anything until index " + i + " " + (i < target.length ? target[i] : "END"));
 		return -1;
 	}
 
+	/**
+	 * Check if the threshold has been met to trigger a resize, and perform the resize if it was met.
+	 * The threshold is when the current load factor is more than the configured maximum load factor.
+	 * A new table will be created, with a size equal to the next power of two, and all the elements
+	 * of the current table will be copied to the new table.
+	 *
+	 * @param force if true, force resize even if the threshold is not reached
+	 */
 	@SuppressWarnings("unchecked")
 	private void resizeIfNeeded(boolean force) {
 		final float currentLoadFactor = this.size / (float)this.table.length;
-		System.err.println("currentLoadFactor=" + currentLoadFactor);
-		if (currentLoadFactor < loadFactor && !force) {
+		if (currentLoadFactor < this.loadFactor && !force) {
 			return;
 		}
 		final int nextPowerOfTwo = (32 - Integer.numberOfLeadingZeros(this.table.length - 1));
 		final int newCapacity = 1 << (nextPowerOfTwo + 1);
-		System.err.println("newCapacity=" + newCapacity);
 		final Entry<K, V>[] newTable = (Entry<K, V>[]) new Entry[newCapacity];
 		for (Entry<K, V> entry : this.table) {
 			Entry<K, V> current = entry;
 			if (entry != null) {
-				System.err.println("nested put for key " + current.key);
 				putEntryForKey(newTable, current.key, current.value);
 			}
 		}
 		this.table = newTable;
 	}
 
-	private static void assertNotNull(Object param, String message) {
-		if (param == null) {
-			throw new NullPointerException(message);
+	/**
+	 * Exception that will be thrown when a Hash Map is resized more than
+	 * a pre-defined count during an insertion.
+	 * This is needed in order to prevent the operation to cause a stack overflow
+	 * or out of memory error.
+	 * This should not happen in theory, as one resize is enough to handle most cases.
+	 */
+	public static class TooManyHashMapResizeException extends RuntimeException {
+		public TooManyHashMapResizeException(String message) {
+			super(message);
 		}
 	}
 
+	/**
+	 * Exception that is thrown when a resize is needed.
+	 */
+	private static class HashMapNeedResizeException extends RuntimeException {
+		public HashMapNeedResizeException(String message) {
+			super(message);
+		}
+	}
 }

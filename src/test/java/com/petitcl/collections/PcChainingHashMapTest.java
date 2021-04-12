@@ -1,7 +1,7 @@
 package com.petitcl.collections;
 
 import com.petitcl.collections.models.Person;
-import com.petitcl.collections.utils.AbstractMapTestSuite;
+import com.petitcl.collections.utils.AbstractPersonMapTestSuite;
 import org.junit.Test;
 
 import java.util.Map;
@@ -12,15 +12,22 @@ public class PcChainingHashMapTest {
 
 	@Test
 	public void testLoad() {
-		new PcChainingHashMapTestSuite()
-				.runTests();
+		new PcChainingHashPersonMapTestSuite()
+				.withStartDataSetSize(0)
+				.withEndDataSetSize(15)
+				.runAllTests();
 	}
 
-	public static class PcChainingHashMapTestSuite extends AbstractMapTestSuite {
+	public static class PcChainingHashPersonMapTestSuite extends AbstractPersonMapTestSuite {
 
 		@Override
 		protected Map<String, Person> createEmptyMap() {
 			return new PcChainingHashMap<>();
+		}
+
+		@Override
+		protected Map<String, Person> createEmptyMap(float loadFactor) {
+			return new PcChainingHashMap<>(PcChainingHashMap.DEFAULT_INITIAL_CAPACITY, loadFactor);
 		}
 
 		@Override
