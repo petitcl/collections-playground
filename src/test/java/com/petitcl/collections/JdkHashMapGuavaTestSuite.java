@@ -8,6 +8,7 @@ import com.petitcl.collections.models.Person;
 import com.petitcl.collections.utils.AbstractPersonMapTestGenerator;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.AllTests;
@@ -15,6 +16,11 @@ import org.junit.runners.AllTests;
 import java.util.HashMap;
 import java.util.Map;
 
+/**
+ * Reference test suite to demonstrate the use of Guava test lib.
+ * This test suite verifies that java.util.HashMap correctly implements java.util.Map.
+ */
+@Ignore
 @RunWith(AllTests.class)
 public class JdkHashMapGuavaTestSuite extends TestCase {
 

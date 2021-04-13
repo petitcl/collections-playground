@@ -157,7 +157,11 @@ public class PcChainingHashMap<K, V> extends AbstractMap<K, V> {
 
 	@Override
 	public void clear() {
-		doClear();
+		this.size = 0;
+		if (this.table == null) {
+			return;
+		}
+		Arrays.fill(this.table, null);
 	}
 
 	@Override
@@ -184,7 +188,7 @@ public class PcChainingHashMap<K, V> extends AbstractMap<K, V> {
 
 		@Override
 		public void clear() {
-			doClear();
+			PcChainingHashMap.this.clear();
 		}
 	}
 
@@ -219,7 +223,7 @@ public class PcChainingHashMap<K, V> extends AbstractMap<K, V> {
 
 		@Override
 		public void clear() {
-			doClear();
+			PcChainingHashMap.this.clear();
 		}
 	}
 
@@ -254,7 +258,7 @@ public class PcChainingHashMap<K, V> extends AbstractMap<K, V> {
 
 		@Override
 		public void clear() {
-			doClear();
+			PcChainingHashMap.this.clear();
 		}
 	}
 
@@ -272,6 +276,7 @@ public class PcChainingHashMap<K, V> extends AbstractMap<K, V> {
 		private Node<K, V> currentNode;
 
 		public BaseIterator() {
+			final Node<K, V>[]table = PcChainingHashMap.this.table;
 			this.indexInTable = 0;
 			this.nextNode = null;
 			this.currentNode = null;
@@ -307,6 +312,7 @@ public class PcChainingHashMap<K, V> extends AbstractMap<K, V> {
 		}
 
 		private void computeNext() {
+			final Node<K, V>[]table = PcChainingHashMap.this.table;
 			// advance currentNode in current list if not null
 			if (nextNode != null && nextNode.next != null) {
 				// if currentNode has a next, advance to it
@@ -510,14 +516,6 @@ public class PcChainingHashMap<K, V> extends AbstractMap<K, V> {
 			current = current.next;
 		}
 		return null;
-	}
-
-	private void doClear() {
-		this.size = 0;
-		if (this.table == null) {
-			return;
-		}
-		Arrays.fill(this.table, null);
 	}
 
 	@SuppressWarnings("unchecked")

@@ -7,6 +7,8 @@ such as `Map` or `List`.
 Some data structures have multiple implementations in order to demonstrate
 the different strategies available.
 
+The custom implementations are unit testes with [Guava test lib](https://github.com/google/guava)
+
 ## Collections
 
 - [PcChainingHashMap](src/main/java/com/petitcl/collections/PcChainingHashMap.java) :
