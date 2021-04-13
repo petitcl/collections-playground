@@ -16,6 +16,7 @@ public abstract class AbstractPersonMapTestSuite {
 	private int startLoadFactor = 50;
 	private int endLoadFactor = 99;
 	private int loadFactorStep = 1;
+	private boolean testDelete = true;
 //	private long seed = System.nanoTime();
 	private long seed = 424242424242L;
 	private Random random;
@@ -28,6 +29,26 @@ public abstract class AbstractPersonMapTestSuite {
 
 	public AbstractPersonMapTestSuite withEndDataSetSize(int endDataSetSize) {
 		this.endDataSetSize = endDataSetSize;
+		return this;
+	}
+
+	public AbstractPersonMapTestSuite withStartLoadFactor(int startLoadFactor) {
+		this.startLoadFactor = startLoadFactor;
+		return this;
+	}
+
+	public AbstractPersonMapTestSuite withEndLoadFactor(int endLoadFactor) {
+		this.endLoadFactor = endLoadFactor;
+		return this;
+	}
+
+	public AbstractPersonMapTestSuite withLoadFactorStep(int loadFactorStep) {
+		this.loadFactorStep = loadFactorStep;
+		return this;
+	}
+
+	public AbstractPersonMapTestSuite withTestDelete(boolean testDelete) {
+		this.testDelete = testDelete;
 		return this;
 	}
 
@@ -82,6 +103,9 @@ public abstract class AbstractPersonMapTestSuite {
 		}
 		assertMapEqualsReferenceMap(referenceMap, map);
 
+		if (!testDelete) {
+			return;
+		}
 		for (Iterator<Map.Entry<String, Person>> it = referenceMap.entrySet().iterator(); it.hasNext();) {
 			final Map.Entry<String, Person> entry = it.next();
 			final String key = entry.getKey();
