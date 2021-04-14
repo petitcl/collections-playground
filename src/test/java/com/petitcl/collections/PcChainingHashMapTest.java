@@ -13,8 +13,9 @@ public class PcChainingHashMapTest {
 	@Test
 	public void testLoad() {
 		new PcChainingHashPersonMapTestSuite()
-				.withStartDataSetSize(0)
+				.withStartDataSetSize(1)
 				.withEndDataSetSize(15)
+				.withDebugLayout(true)
 				.runAllTests();
 	}
 

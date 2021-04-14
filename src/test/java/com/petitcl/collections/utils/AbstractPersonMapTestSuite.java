@@ -2,12 +2,15 @@ package com.petitcl.collections.utils;
 
 import com.petitcl.collections.models.Person;
 import org.apache.commons.lang3.RandomStringUtils;
+import org.hamcrest.Matchers;
 import org.junit.Assert;
 
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Random;
+
+import static org.hamcrest.MatcherAssert.assertThat;
 
 public abstract class AbstractPersonMapTestSuite {
 
@@ -17,6 +20,8 @@ public abstract class AbstractPersonMapTestSuite {
 	private int endLoadFactor = 99;
 	private int loadFactorStep = 1;
 	private boolean testDelete = true;
+	private boolean debugLayout = false;
+	private boolean verifyContent = true;
 //	private long seed = System.nanoTime();
 	private long seed = 424242424242L;
 	private Random random;
@@ -49,6 +54,16 @@ public abstract class AbstractPersonMapTestSuite {
 
 	public AbstractPersonMapTestSuite withTestDelete(boolean testDelete) {
 		this.testDelete = testDelete;
+		return this;
+	}
+
+	public AbstractPersonMapTestSuite withDebugLayout(boolean debugLayout) {
+		this.debugLayout = debugLayout;
+		return this;
+	}
+
+	public AbstractPersonMapTestSuite withVerifyContent(boolean verifyContent) {
+		this.verifyContent = verifyContent;
 		return this;
 	}
 
@@ -125,9 +140,13 @@ public abstract class AbstractPersonMapTestSuite {
 
 	private void assertMapEqualsReferenceMap(Map<String, Person> referenceMap, Map<String, Person> map) {
 		System.err.println("referenceMap=" + referenceMap);
-//		System.err.println("map=" + map);
-//		printMapLayout(map);
-//		assertThat(map.entrySet(), Matchers.containsInAnyOrder(referenceMap.entrySet().toArray()));
+		if (debugLayout) {
+			System.err.println("map=" + map);
+			printMapLayout(map);
+		}
+		if (verifyContent) {
+			assertThat(map.entrySet(), Matchers.containsInAnyOrder(referenceMap.entrySet().toArray()));
+		}
 		Assert.assertEquals(referenceMap.size(), map.size());
 	}
 
