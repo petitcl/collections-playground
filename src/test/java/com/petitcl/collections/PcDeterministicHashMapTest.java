@@ -14,9 +14,7 @@ public class PcDeterministicHashMapTest {
 	public void testLoad() {
 		new PcDeterministicHashPersonMapTestSuite()
 				.withStartDataSetSize(1)
-				.withEndDataSetSize(12)
-				.withDebugLayout(true)
-				.withVerifyContent(false)
+				.withEndDataSetSize(15)
 				.runAllTests();
 	}
 

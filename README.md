@@ -26,11 +26,10 @@ The custom implementations are unit testes with [Guava test lib](https://github.
   to handle collisions.
 
 ## Todo
-- Linear probing hash table with tombstones
 - [Quadratic probing hash table](https://en.wikipedia.org/wiki/Quadratic_probing)
 - [Robin Hood hash table](https://en.wikipedia.org/wiki/Hash_table#Robin_Hood_hashing)
 - Array list
-- Double Linked list (Queue / )
+- Double Linked list (Queue / Stack / Deque)
 - Queue
 - Stack
 - Deque

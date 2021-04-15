@@ -10,9 +10,12 @@ import java.util.*;
  * - a data table that contains inserted entries. The order in this table is the insertion order.
  * This allows to maintain insertion order while iterating over the map.
  *
- * This method is also referred as Close Tables, after their inventor, Tyler Close.
+ * This class also uses tombstones: when a node is delete from the data table,
+ * a tombstone node is left in the spot of the deleted node. This keeps intact
+ * the chain of non null nodes, allowing to iterate on the data table until finding a null node,
+ * thus lowering the number of steps needed to traverse the map.
  *
- * todo: implement tombstones to avoid to need to iterate over whole data table
+ * This method is also referred as Close Tables, after their inventor, Tyler Close.
  */
 public class PcDeterministicHashMap<K, V> extends AbstractMap<K, V> {
 
@@ -55,6 +58,15 @@ public class PcDeterministicHashMap<K, V> extends AbstractMap<K, V> {
 			return oldValue;
 		}
 
+		public void setTombstone() {
+			this.key = null;
+			this.value = null;
+		}
+
+		public boolean isTombstone() {
+			return this.key == null && this.value == null;
+		}
+
 		@Override
 		public final int hashCode() {
 			return Objects.hashCode(key) ^ Objects.hashCode(value);
@@ -76,6 +88,7 @@ public class PcDeterministicHashMap<K, V> extends AbstractMap<K, V> {
 			return false;
 		}
 
+		@Override
 		public final String toString() { return key + "=" + value; }
 	}
 
@@ -181,8 +194,7 @@ public class PcDeterministicHashMap<K, V> extends AbstractMap<K, V> {
 	public V remove(Object key) {
 		Objects.requireNonNull(key);
 
-		final Node<K, V> removedNode = removeNodeForKey(key);
-		return removedNode != null ? removedNode.value : null;
+		return removeNodeForKey(key);
 	}
 
 	@Override
@@ -304,14 +316,16 @@ public class PcDeterministicHashMap<K, V> extends AbstractMap<K, V> {
 		private Node<K, V> currentNode;
 
 		public BaseIterator() {
-			final Node<K, V>[]dataTable = PcDeterministicHashMap.this.dataTable;
 			this.indexInDataTable = 0;
 			this.nextNode = null;
 			this.currentNode = null;
 			// initially advance to first node
-			while (nextNode == null && indexInDataTable < dataTable.length) {
-				nextNode = dataTable[indexInDataTable];
-				if (nextNode == null) {
+			final Node<K, V>[] dataTable = PcDeterministicHashMap.this.dataTable;
+			while (indexInDataTable < dataTable.length && dataTable[indexInDataTable] != null && nextNode == null) {
+				final Node<K, V> current = dataTable[indexInDataTable];
+				if (!current.isTombstone()) {
+					nextNode = current;
+				} else {
 					indexInDataTable++;
 				}
 			}
@@ -340,21 +354,20 @@ public class PcDeterministicHashMap<K, V> extends AbstractMap<K, V> {
 		}
 
 		private void computeNext() {
-			final Node<K, V>[]dataTable = PcDeterministicHashMap.this.dataTable;
-			// advance index in data table
+			final Node<K, V>[] dataTable = PcDeterministicHashMap.this.dataTable;
 			indexInDataTable++;
 			nextNode = null;
-
-			// advance currentNode to the next head node in the data table
-			// or to the end of the data table
-			while (nextNode == null && indexInDataTable < dataTable.length) {
-				nextNode = dataTable[indexInDataTable];
-				if (nextNode == null) {
+			// advance index in data table
+			// stop iterating if we reached a null value
+			while (indexInDataTable < dataTable.length && dataTable[indexInDataTable] != null && nextNode == null) {
+				final Node<K, V> current = dataTable[indexInDataTable];
+				if (!current.isTombstone()) {
+					nextNode = current;
+				} else {
 					indexInDataTable++;
 				}
 			}
 		}
-
 	}
 
 	public String getLayout() {
@@ -421,24 +434,19 @@ public class PcDeterministicHashMap<K, V> extends AbstractMap<K, V> {
 	}
 
 	private V putNodeForKey(Node<K, V>[] targetDataTable, int[] targetHashTable, int nextSlot, K key, V value) {
-		System.err.println("");
 		// compute hash and index
 		final int hash = hash(key);
 		final int size = targetHashTable.length;
 		final int indexInHashTable = (size - 1) & hash;
-		System.err.println("put " + key + " nextSlot=" + nextSlot);
-		System.err.println("put " + key + " indexInHashTable="+indexInHashTable);
 
 		// get node at index
 		final int indexInDataTable = targetHashTable[indexInHashTable];
-		System.err.println("put " + key + " indexInDataTable="+indexInDataTable);
 		if (indexInDataTable == -1 || targetDataTable[indexInDataTable] == null) {
 			// if the index in hash table is -1, the node does not exist yet
 			// we can simply create it and insert it in the data table at the next slot
 			// we also set the data table index in the hash table
 			targetDataTable[nextSlot] = new Node<>(key, value);
 			targetHashTable[indexInHashTable] = nextSlot;
-			System.err.println("put " + key + " upsertedAtHead nextSlot=" + nextSlot + " index=" + indexInHashTable);
 			return null;
 		} else {
 			// if the index in hash table is not -1, there are nodes at that index
@@ -449,7 +457,7 @@ public class PcDeterministicHashMap<K, V> extends AbstractMap<K, V> {
 			Node<K, V> tail = nodeAtIndex;
 			// todo: find out if it's better to append or prepend
 			while (current != null) {
-				if (current.key.equals(key)) {
+				if (key.equals(current.key)) {
 					break;
 				}
 				if (current.next == null) {
@@ -458,7 +466,6 @@ public class PcDeterministicHashMap<K, V> extends AbstractMap<K, V> {
 				current = current.next;
 			}
 			if (current == null) {
-				System.err.println("put " + key + " tail=" + (tail != null ? tail.key : null));
 				// if we reached the end, the key does not exist, so we append a new node to the tail
 				// we insert it in the data table at next slot
 				// we do no update the hash table, as it is already pointing to the head of the chain
@@ -467,10 +474,8 @@ public class PcDeterministicHashMap<K, V> extends AbstractMap<K, V> {
 					tail.next = upsertedNode;
 				}
 				targetDataTable[nextSlot] = upsertedNode;
-				System.err.println("put " + key + " upsertedAtTail nextSlot=" + nextSlot + " index=" + indexInHashTable);
 				return null;
 			} else {
-				System.err.println("put " + key + " updating current="+current);
 				// if we found a node with the same key,
 				// we just update it without adding it to the hash table
 				return current.setValue(value);
@@ -483,27 +488,20 @@ public class PcDeterministicHashMap<K, V> extends AbstractMap<K, V> {
 	}
 
 	private Node<K, V> getNodeForKey(Node<K, V>[] targetDataTable, int[] targetHashTable, Object key) {
-		System.err.println("");
 		// compute hash and index
 		final int hash = hash(key);
 		final int size = targetHashTable.length;
 		final int indexInHashTable = (size - 1) & hash;
-		System.err.println("get " + key + " hash=" + hash);
-		System.err.println("get " + key + " indexInHashTable=" + indexInHashTable);
 
 		// get node at index
 		final int indexInDataTable = targetHashTable[indexInHashTable];
 		// if index in hash table is -1, it means no node was inserted for this index
-		System.err.println("get " + key + " indexInDataTable=" + indexInDataTable);
 		if (indexInDataTable == -1) {
-			System.err.println("get " + key + " nothing at indexInDataTable=" + indexInDataTable);
 			return null;
 		}
 		final Node<K, V> nodeAtIndex = targetDataTable[indexInDataTable];
-		System.err.println("get " + key + " nodeAtIndex=" + nodeAtIndex);
 		if (nodeAtIndex == null) {
 			// if no node at index, return null
-			System.err.println("get " + key + " head is null");
 			return null;
 		} else {
 			// if there is a node at index, traverse it until we find it
@@ -511,53 +509,40 @@ public class PcDeterministicHashMap<K, V> extends AbstractMap<K, V> {
 		}
 	}
 
-	private Node<K, V> removeNodeForKey(Object key) {
-		final Node<K, V> removedNode = removeNodeForKey(this.dataTable, this.hashTable, key);
-		if (removedNode != null) {
+	private V removeNodeForKey(Object key) {
+		final V removedValue = removeNodeForKey(this.dataTable, this.hashTable, key);
+		if (removedValue != null) {
 			// if old value was null, it means we removed an element
 			this.size--;
 		}
-		return removedNode;
+		return removedValue;
 	}
 
-	private Node<K, V> removeNodeForKey(Node<K, V>[] targetDataTable, int[] targetHashTable, Object key) {
+	private V removeNodeForKey(Node<K, V>[] targetDataTable, int[] targetHashTable, Object key) {
 		// compute hash and index
-		System.err.println("");
 		final int hash = hash(key);
 		final int size = targetHashTable.length;
 		final int indexInHashTable = (size - 1) & hash;
-		System.err.println("del " + key + " hash=" + hash);
-		System.err.println("del " + key + " indexInHashTable=" + indexInHashTable);
 
 		// get node at index
 		final int indexInDataTable = targetHashTable[indexInHashTable];
 		if (indexInDataTable == -1 || targetDataTable[indexInDataTable] == null) {
-			System.err.println("del " + key + " nothing at indexInDataTable=" + indexInDataTable);
 			// if index is -1 or node does not exist, the key didn't exist
 			return null;
 		} else {
 			// if node exists, try to remove key from node chain
 			Node<K, V> head = targetDataTable[indexInDataTable];
 			Node<K, V> current = head;
-			Node<K, V> prev = null;
 			while (current != null) {
-				System.err.println("del " + key + " iterating over current=" + current);
-				if (current.key.equals(key)) {
-					if (prev != null) {
-						prev.next = current.next;
-					}
-					if (head == current) {
-						// if target node was the head, set the head to its next
-//						targetDataTable[indexInDataTable] = current.next;
-						targetDataTable[indexInDataTable] = current.next;
-					}
-					System.err.println("del " + key + " deleted current=" + indexInDataTable);
-					return current;
+				if (key.equals(current.key) && !current.isTombstone()) {
+					final V oldValue = current.value;
+					// delete node by setting its key and value to null
+					// this is also called a tombstone
+					current.setTombstone();
+					return oldValue;
 				}
-				prev = current;
 				current = current.next;
 			}
-			System.err.println("del " + key + " not found after traversing  at indexInDataTable=" + indexInDataTable);
 			return null;
 		}
 	}
@@ -565,8 +550,7 @@ public class PcDeterministicHashMap<K, V> extends AbstractMap<K, V> {
 	private Node<K, V> findNode(Node<K, V> head, Object key) {
 		Node<K, V> current = head;
 		while (current != null) {
-			System.err.println("iterating over " + current.key);
-			if (current.key.equals(key)) {
+			if (key.equals(current.key)) {
 				return current;
 			}
 			current = current.next;
@@ -577,19 +561,20 @@ public class PcDeterministicHashMap<K, V> extends AbstractMap<K, V> {
 	@SuppressWarnings("unchecked")
 	private void resizeIfNeeded(int newSize) {
 		final float currentLoadFactor = this.size / (float)this.hashTable.length;
-		System.err.println("currentLoadFactor=" + currentLoadFactor + " nextSlot=" + nextSlot);
 		if (currentLoadFactor < this.loadFactor && this.nextSlot < this.hashTable.length) {
 			return;
 		}
-		System.err.println("resize");
 		final int nextPowerOfTwo = (32 - Integer.numberOfLeadingZeros(newSize - 1));
 		final int newCapacity = 1 << (nextPowerOfTwo + 1);
 		final Node<K, V>[] newDataTable = (Node<K, V>[]) new Node[newCapacity];
 		final int[] newHashTable = new int[newCapacity];
 		Arrays.fill(newHashTable, -1);
 		int newNextSlot = 0;
-		for (Node<K, V> node : this.dataTable) {
-			if (node != null) {
+		// we iterate on the table until we find a null node
+		// this means all remaining entries are also null
+		for (int i = 0; i < this.dataTable.length && this.dataTable[i] != null; i++) {
+			final Node<K, V> node = this.dataTable[i];
+			if (!node.isTombstone()) {
 				putNodeForKey(newDataTable, newHashTable, newNextSlot, node.key, node.value);
 				newNextSlot++;
 			}

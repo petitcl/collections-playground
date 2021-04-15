@@ -4,30 +4,29 @@ import com.petitcl.collections.models.Person;
 import com.petitcl.collections.utils.AbstractPersonMapTestSuite;
 import org.junit.Test;
 
+import java.util.HashMap;
 import java.util.Map;
 
-import static org.hamcrest.MatcherAssert.assertThat;
-
-public class PcChainingHashMapTest {
+public class JdkHashMapTest {
 
 	@Test
 	public void testLoad() {
-		new PcChainingHashPersonMapTestSuite()
+		new JdkHashPersonMapTestSuite()
 				.withStartDataSetSize(1)
 				.withEndDataSetSize(15)
 				.runAllTests();
 	}
 
-	public static class PcChainingHashPersonMapTestSuite extends AbstractPersonMapTestSuite {
+	public static class JdkHashPersonMapTestSuite extends AbstractPersonMapTestSuite {
 
 		@Override
 		protected Map<String, Person> createEmptyMap() {
-			return new PcChainingHashMap<>();
+			return new HashMap<>();
 		}
 
 		@Override
 		protected Map<String, Person> createEmptyMap(float loadFactor) {
-			return new PcChainingHashMap<>(PcChainingHashMap.DEFAULT_INITIAL_CAPACITY, loadFactor);
+			return new HashMap<>(16, loadFactor);
 		}
 
 		@Override
