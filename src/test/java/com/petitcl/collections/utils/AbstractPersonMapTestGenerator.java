@@ -40,4 +40,5 @@ public abstract class AbstractPersonMapTestGenerator implements TestMapGenerator
 	public Iterable<Map.Entry<String, Person>> order(List<Map.Entry<String, Person>> insertionOrder) {
 		return insertionOrder;
 	}
+
 }
