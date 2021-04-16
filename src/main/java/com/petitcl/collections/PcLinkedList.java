@@ -62,8 +62,6 @@ public class PcLinkedList<E> extends AbstractSequentialList<E> {
 	private int size;
 
 	public PcLinkedList() {
-		System.err.println("");
-		System.err.println("PcLinkedList");
 		head = null;
 		tail = null;
 		size = 0;
@@ -118,7 +116,6 @@ public class PcLinkedList<E> extends AbstractSequentialList<E> {
 
 	@Override
 	public boolean add(E e) {
-		System.err.println("add " + e);
 		Objects.requireNonNull(e);
 
 		addNodeLast(e);
@@ -162,7 +159,6 @@ public class PcLinkedList<E> extends AbstractSequentialList<E> {
 
 	@Override
 	public boolean addAll(int index, Collection<? extends E> c) {
-		System.err.println(" addAll " + 0 + " " + c);
 		assertIndexIsValid(index, this.size + 1);
 		Objects.requireNonNull(c);
 
@@ -282,7 +278,6 @@ public class PcLinkedList<E> extends AbstractSequentialList<E> {
 
 	@Override
 	public E set(int index, E element) {
-		System.err.println("set " + index + " " + element);
 		assertIndexIsValid(index, this.size);
 		Objects.requireNonNull(element);
 
@@ -291,18 +286,14 @@ public class PcLinkedList<E> extends AbstractSequentialList<E> {
 
 	@Override
 	public void add(int index, E element) {
-		System.err.println("add " + index + " " + element);
-		System.err.println(getLayout());
 		assertIndexIsValid(index, this.size + 1);
 		Objects.requireNonNull(element);
 
 		insertNodeAtIndex(index, element);
-		System.err.println(getLayout());
 	}
 
 	@Override
 	public E remove(int index) {
-		System.err.println("remove " + index);
 		assertIndexIsValid(index, this.size);
 
 		final Node<E> toRemove = getNodeAtIndex(index);
@@ -510,7 +501,6 @@ public class PcLinkedList<E> extends AbstractSequentialList<E> {
 
 	private Node<E> insertListAtIndex(int index, Node<E> listHead, Node<E> listTail, int listSize) {
 		if (index == size) {
-			System.err.println("index == size");
 			if (this.tail != null) {
 				this.tail.next = listHead;
 			}
@@ -518,13 +508,11 @@ public class PcLinkedList<E> extends AbstractSequentialList<E> {
 			this.tail = listTail;
 		}
 		if (index == 0) {
-			System.err.println("index == 0");
 			if (this.head != null) {
 				this.head.prev = listTail;
 			}
 			listTail.next = this.head;
 			this.head = listHead;
-			System.err.println("head=" + this.head);
 		}
 		if (index != 0 && index != size) {
 			final Node<E> node = getNodeAtIndex(index);
