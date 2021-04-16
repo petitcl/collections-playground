@@ -1,8 +1,13 @@
 package com.petitcl.collections;
 
 import java.util.*;
+import java.util.function.Consumer;
+import java.util.function.Predicate;
+import java.util.function.UnaryOperator;
 
-// todo: implement Deque
+// todo: reimplement List<E> subList(int fromIndex, int toIndex);
+// todo: reimplement Spliterator<E> spliterator();
+// todo: reimplement void sort(Comparator<? super E> c);
 public class PcLinkedList<E> extends AbstractSequentialList<E> {
 
 	public static class Node<E> {
@@ -57,6 +62,8 @@ public class PcLinkedList<E> extends AbstractSequentialList<E> {
 	private int size;
 
 	public PcLinkedList() {
+		System.err.println("");
+		System.err.println("PcLinkedList");
 		head = null;
 		tail = null;
 		size = 0;
@@ -111,9 +118,11 @@ public class PcLinkedList<E> extends AbstractSequentialList<E> {
 
 	@Override
 	public boolean add(E e) {
+		System.err.println("add " + e);
 		Objects.requireNonNull(e);
 
-		return addNodeLast(e);
+		addNodeLast(e);
+		return true;
 	}
 
 	@Override
@@ -153,8 +162,35 @@ public class PcLinkedList<E> extends AbstractSequentialList<E> {
 
 	@Override
 	public boolean addAll(int index, Collection<? extends E> c) {
+		System.err.println(" addAll " + 0 + " " + c);
+		assertIndexIsValid(index, this.size + 1);
 		Objects.requireNonNull(c);
-		return false;
+
+		if (c.isEmpty()) {
+			return false;
+		}
+		Node<E> listHead = null;
+		Node<E> listTail = null;
+		Node<E> prev = null;
+		int i = 0;
+		for (Object e : c) {
+			Objects.requireNonNull(e);
+			final Node<E> newNode = new Node<>((E)e);
+			if (prev != null) {
+				prev.next = newNode;
+				newNode.prev = prev;
+			}
+			if (i == 0) {
+				listHead = newNode;
+			}
+			if ((i + 1) == c.size()) {
+				listTail = newNode;
+			}
+			i++;
+			prev = newNode;
+		}
+		insertListAtIndex(index, listHead, listTail, i);
+		return true;
 	}
 
 	@Override
@@ -162,9 +198,29 @@ public class PcLinkedList<E> extends AbstractSequentialList<E> {
 		Objects.requireNonNull(c);
 
 		boolean modified = false;
-		for (Object e : c) {
-			Objects.requireNonNull(e);
-			modified |= remove(e);
+		final Iterator<E> iterator = iterator();
+		while (iterator.hasNext()) {
+			final E e = iterator.next();
+			if (c.contains(e)) {
+				iterator.remove();
+				modified = true;
+			}
+		}
+		return modified;
+	}
+
+	@Override
+	public boolean removeIf(Predicate<? super E> filter) {
+		Objects.requireNonNull(filter);
+
+		boolean modified = false;
+		final Iterator<E> iterator = iterator();
+		while (iterator.hasNext()) {
+			final E e = iterator.next();
+			if (filter.test(e)) {
+				iterator.remove();
+				modified = true;
+			}
 		}
 		return modified;
 	}
@@ -186,21 +242,47 @@ public class PcLinkedList<E> extends AbstractSequentialList<E> {
 	}
 
 	@Override
+	public void replaceAll(UnaryOperator<E> operator) {
+		Objects.requireNonNull(operator);
+
+		final ListIterator<E> iterator = listIterator();
+		while (iterator.hasNext()) {
+			final E e = iterator.next();
+			iterator.set(operator.apply(e));
+		}
+	}
+
+	@Override
+	public void forEach(Consumer<? super E> action) {
+		Objects.requireNonNull(action);
+
+		for (E e : this) {
+			action.accept(e);
+		}
+	}
+
+	@Override
 	public void clear() {
-		size = 0;
-		head = null;
-		tail = null;
+		this.size = 0;
+		this.head = null;
+		this.tail = null;
 	}
 
 	@Override
 	public E get(int index) {
 		assertIndexIsValid(index, this.size);
 
-		return getNodeAtIndex(index).value;
+
+		Node<E> nodeAtIndex = getNodeAtIndex(index);
+		if (nodeAtIndex == null) {
+			return null;
+		}
+		return nodeAtIndex.value;
 	}
 
 	@Override
 	public E set(int index, E element) {
+		System.err.println("set " + index + " " + element);
 		assertIndexIsValid(index, this.size);
 		Objects.requireNonNull(element);
 
@@ -209,26 +291,18 @@ public class PcLinkedList<E> extends AbstractSequentialList<E> {
 
 	@Override
 	public void add(int index, E element) {
-		assertIndexIsValid(index, this.size);
+		System.err.println("add " + index + " " + element);
+		System.err.println(getLayout());
+		assertIndexIsValid(index, this.size + 1);
 		Objects.requireNonNull(element);
 
-		final Node<E> newNode = new Node<>(element);
-		final Node<E> node = getNodeAtIndex(index);
-		if (node.prev != null) {
-			final Node<E> prev = node.prev;
-			prev.next = newNode;
-			newNode.prev = prev;
-			newNode.next = node;
-			node.prev = newNode;
-		} else {
-			node.prev = newNode;
-			head = newNode;
-		}
-		this.size++;
+		insertNodeAtIndex(index, element);
+		System.err.println(getLayout());
 	}
 
 	@Override
 	public E remove(int index) {
+		System.err.println("remove " + index);
 		assertIndexIsValid(index, this.size);
 
 		final Node<E> toRemove = getNodeAtIndex(index);
@@ -257,26 +331,32 @@ public class PcLinkedList<E> extends AbstractSequentialList<E> {
 
 	@Override
 	public ListIterator<E> listIterator(int index) {
-		assertIndexIsValid(index, this.size);
+		assertIndexIsValid(index, this.size + 1);
 
 		return new PcLinkedListIterator(index);
 	}
 
 	public class PcLinkedListIterator implements ListIterator<E> {
+
+		private int previousIndex;
+		private int nextIndex;
+		private Node<E> previous;
 		private Node<E> next;
-		private Node<E> current;
-		private int index;
+		private Node<E> lastVisited;
 
 		public PcLinkedListIterator() {
-			this.index = 0;
+			this.previousIndex = -1;
+			this.nextIndex = 0;
+			this.previous = null;
 			this.next = PcLinkedList.this.head;
-			this.current = null;
+			this.lastVisited = null;
 		}
 
 		public PcLinkedListIterator(int index) {
-			this.index = index;
-			this.next = PcLinkedList.this.getNodeAtIndex(this.index);
-			this.current = next.prev;
+			this();
+			for (int i = 0; i < index; i++) {
+				next();
+			}
 		}
 
 		@Override
@@ -289,89 +369,173 @@ public class PcLinkedList<E> extends AbstractSequentialList<E> {
 			if (this.next == null) {
 				throw new NoSuchElementException();
 			}
-			final E nextValue = this.next.value;
-			this.current = this.next;
+			final E value = this.next.value;
+			this.lastVisited = this.next;
+			this.previous = this.next;
 			this.next = this.next.next;
-			this.index++;
-			return nextValue;
+			this.previousIndex++;
+			this.nextIndex++;
+			return value;
 		}
 
 		@Override
 		public boolean hasPrevious() {
-			return this.next.prev != null;
+			return this.previous != null;
 		}
 
 		@Override
 		public E previous() {
-			return this.next.prev != null ? this.next.prev.value : null;
+			if (this.previous == null) {
+				throw new NoSuchElementException();
+			}
+			final E value = this.previous.value;
+			this.lastVisited = this.previous;
+			this.next = this.previous;
+			this.previous = this.previous.prev;
+			this.previousIndex--;
+			this.nextIndex--;
+			return value;
 		}
 
 		@Override
 		public int nextIndex() {
-			return this.index + 1;
+			return this.nextIndex;
 		}
 
 		@Override
 		public int previousIndex() {
-			return Math.max(this.index + 1, 0);
+			return this.previousIndex;
 		}
 
 		@Override
 		public void remove() {
-			if (this.current == null) {
-				throw new IllegalStateException("next() has not been called yet, cannot use remove()");
+			if (this.lastVisited == null) {
+				throw new IllegalStateException();
 			}
-			removeNode(this.current);
+			if (this.lastVisited == this.next) {
+				this.next = this.next.next;
+				removeNode(this.lastVisited);
+			} else {
+				this.previous = this.previous.prev;
+				removeNode(this.lastVisited);
+				this.nextIndex--;
+				this.previousIndex--;
+			}
+			this.lastVisited = null;
 		}
 
 		@Override
 		public void set(E e) {
-			throw new UnsupportedOperationException();
+			if (this.lastVisited == null) {
+				throw new IllegalStateException();
+			}
+			this.lastVisited.value = e;
 		}
 
 		@Override
 		public void add(E e) {
-			throw new UnsupportedOperationException();
+			final Node<E> newNode = new Node<>(e);
+			newNode.next = this.next;
+			newNode.prev = this.previous;
+			if (this.previous != null) {
+				this.previous.next = newNode;
+			}
+			if (this.next != null) {
+				this.next.prev = newNode;
+			}
+			PcLinkedList.this.size++;
+			if (newNode.prev == null) {
+				PcLinkedList.this.head = newNode;
+			}
+			if (newNode.next == null) {
+				PcLinkedList.this.tail = newNode;
+			}
+
+			this.previous = newNode;
+			this.previousIndex = this.nextIndex;
+			this.nextIndex++;
+			this.lastVisited = null;
 		}
-
 	}
 
-	@Override
-	public List<E> subList(int fromIndex, int toIndex) {
-		assertIndexIsValid(fromIndex, this.size);
-		assertIndexIsValid(toIndex, this.size);
-
-		return null;
+	public String getLayout() {
+		final StringBuilder sb = new StringBuilder();
+		sb.append("size=").append(this.size).append("\n")
+			.append("HEAD=").append(this.head).append("\n")
+			.append("TAIL=").append(this.tail).append("\n");
+		Node<E> current = this.head;
+		int i = 0;
+		while (current != null) {
+			sb.append(i + "=" + current.value).append("\n");
+			current = current.next;
+			i++;
+		}
+		return sb.toString();
 	}
 
-	private boolean addNodeLast(E e) {
+	private Node<E> addNodeLast(E e) {
 		final Node<E> node = new Node<>(e);
 		if (head == null || tail == null) {
 			head = node;
 			tail = node;
 			size++;
-			return true;
+			return node;
 		}
 		tail.next = node;
 		node.prev = tail;
 		tail = node;
 		size++;
-		return true;
+		return node;
 	}
 
-	private boolean addNodeFirst(E e) {
+	private Node<E> addNodeFirst(E e) {
 		final Node<E> node = new Node<>(e);
 		if (head == null || tail == null) {
 			head = node;
 			tail = node;
 			size++;
-			return true;
+			return node;
 		}
 		head.prev = node;
 		node.next = head;
 		head = node;
 		size++;
-		return true;
+		return node;
+	}
+
+	private Node<E> insertNodeAtIndex(int index, E element) {
+		final Node<E> newNode = new Node<>(element);
+		return insertListAtIndex(index, newNode, newNode, 1);
+	}
+
+	private Node<E> insertListAtIndex(int index, Node<E> listHead, Node<E> listTail, int listSize) {
+		if (index == size) {
+			System.err.println("index == size");
+			if (this.tail != null) {
+				this.tail.next = listHead;
+			}
+			listHead.prev = this.tail;
+			this.tail = listTail;
+		}
+		if (index == 0) {
+			System.err.println("index == 0");
+			if (this.head != null) {
+				this.head.prev = listTail;
+			}
+			listTail.next = this.head;
+			this.head = listHead;
+			System.err.println("head=" + this.head);
+		}
+		if (index != 0 && index != size) {
+			final Node<E> node = getNodeAtIndex(index);
+			final Node<E> prev = node.prev;
+			prev.next = listHead;
+			listHead.prev = prev;
+			listTail.next = node;
+			node.prev = listTail;
+		}
+		this.size += listSize;
+		return listHead;
 	}
 
 	private void removeNode(Node<E> node) {
@@ -403,7 +567,6 @@ public class PcLinkedList<E> extends AbstractSequentialList<E> {
 		} else {
 			// else traverse from head
 			current = head;
-			System.err.println(current);
 			int i = 0;
 			while (i < index) {
 				current = current.next;
@@ -454,7 +617,7 @@ public class PcLinkedList<E> extends AbstractSequentialList<E> {
 
 	private void assertIndexIsValid(int index, int size) {
 		if (index < 0 || index >= size ) {
-			throw new IndexOutOfBoundsException( "Index " + index + " is out of bound [0," + size + "]");
+			throw new IndexOutOfBoundsException("Index " + index + " is out of bound [0," + size + "]");
 		}
 	}
 
